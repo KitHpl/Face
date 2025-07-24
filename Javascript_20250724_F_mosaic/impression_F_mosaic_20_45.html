@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>顔の印象評価実験</title>
+  <script src="https://unpkg.com/jspsych@7.3.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-image-keyboard-response@1.1.2"></script>
+  <link href="https://unpkg.com/jspsych@7.3.0/css/jspsych.css" rel="stylesheet" />
+</head>
+<body></body>
+<script>
+
+const jsPsych = initJsPsych({
+  on_finish: function () {
+    jsPsych.data.get().localSave('csv', 'impression_data.csv');
+  }
+});
+
+// 導入スライド
+const intro = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <h3>この実験について</h3>
+    <p>顔画像を見て、その人物の印象を紙の回答用紙に記入してください。</p>
+    <p>紙への記入が終わったらEnterキーを押して次に進んでください。</p>
+    <p>準備ができたらEnterキーを押してください。</p>
+  `,
+  choices: ["Enter"]
+};
+
+// 表示パターンの定義
+const displayPatterns = [
+  { name: "eye", sequence: ["full", "eye", "none"] },
+  { name: "mouth", sequence: ["full", "mouth", "none"] },
+  { name: "none", sequence: ["full", "none"] }
+];
+
+// すべての試行条件を作成
+const all_trials = [];
+for (let angle = 20; angle <= 45; angle++) {
+  displayPatterns.forEach(pattern => {
+    all_trials.push({
+      angle: angle,
+      condition: pattern.name,
+      sequence: pattern.sequence
+    });
+  });
+}
+
+// シャッフル
+const shuffled_trials = jsPsych.randomization.shuffle(all_trials);
+
+// 試行生成
+let trialNumber = 0;
+const main_trials = [];
+
+shuffled_trials.forEach(cfg => {
+  trialNumber++;
+  const imageSequence = cfg.sequence.map((part, idx) => {
+    const filename = part === "none"
+      ? `F_${cfg.angle}.jpg`
+      : `F_${cfg.angle}_${part}.jpg`;
+    return {
+      type: jsPsychImageKeyboardResponse,
+      stimulus: filename,
+      choices: "NO_KEYS",
+      trial_duration: idx === 0 ? 500 : 300,
+      data: {
+        angle: cfg.angle,
+        condition: cfg.condition,
+        phase: `image${idx + 1}`,
+        trial_number: trialNumber
+      }
+    };
+  });
+
+  const textPrompt = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: `
+      <h3>問題 ${trialNumber}</h3>
+      <p>この問題に紙でお答えください。</p>
+      <p>回答が終わったら Enter キーを押して次の問題へ進んでください。</p>
+      <p>Enter を押すとすぐに次の画像が表示されます。</p>
+    `,
+    choices: ["Enter"],
+    data: {
+      phase: 'question_prompt',
+      angle: cfg.angle,
+      condition: cfg.condition,
+      trial_number: trialNumber
+    }
+  };
+
+  main_trials.push(...imageSequence, textPrompt);
+});
+
+// 終了スライド
+const end = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `<h3>実験終了</h3><p>ご協力ありがとうございました。</p><p>Enterキーを押して終了してください。</p>`,
+  choices: ["Enter"]
+};
+
+// 実行
+const timeline = [intro, ...main_trials, end];
+jsPsych.run(timeline);
+
+</script>
+</html>
